@@ -8,6 +8,11 @@ pub fn square_vec(v: glam::Vec2) -> glam::Vec2 {
     v * v
 }
 
+#[inline(always)]
+pub fn outer_product(v1: Vec2, v2: Vec2) -> Mat2 {
+    Mat2::from_cols_array(&[v1.x * v2.x, v1.y * v2.x, v1.x * v2.y, v1.y * v2.y])
+}
+
 pub fn polar_decomp(m: glam::Mat2) -> (glam::Mat2, glam::Mat2) {
     // coords flipped because i think the orig code is row-major
     let mc = m.to_cols_array_2d();

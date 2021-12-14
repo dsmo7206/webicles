@@ -21,7 +21,7 @@ const tri = wasm.Triangle.new(
 //   -1.0 // gravity_y
 // );
 
-const mpm = wasm.RustMlsMpm.new(document.getElementById("canvas2"), 100, 40);
+const mpm = wasm.RustMlsMpm.new(document.getElementById("canvas2"), 500, 40);
 
 const renderLoop = () => {
   tri.draw();

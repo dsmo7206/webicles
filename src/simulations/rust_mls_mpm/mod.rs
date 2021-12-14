@@ -1,8 +1,10 @@
-use crate::gl::{
-    setup_array_buffer_vao, AttribInfo, Buffer, BufferInfo, Colour, Context, Program, Shader,
-    VertexArrayObject,
+use crate::{
+    gl::{
+        setup_array_buffer_vao, AttribInfo, Buffer, BufferInfo, Colour, Context, Program, Shader,
+        VertexArrayObject,
+    },
+    linalg::{mat_add_scalar, outer_product, polar_decomp, square_vec, svd, Mat2, Vec2},
 };
-use crate::linalg::{mat_add_scalar, polar_decomp, square_vec, svd, Mat2, Vec2};
 use rand::distributions::{Distribution, Uniform};
 use wasm_bindgen::{prelude::*, JsCast};
 
@@ -17,14 +19,6 @@ const PLASTIC: bool = false;
 // Initial Lamé parameters
 const MU_0: f32 = E / (2.0 * (1.0 + NU));
 const LAMBDA_0: f32 = E * NU / ((1.0 + NU) * (1.0 - 2.0 * NU));
-
-macro_rules! console {
-    // ($($arg:tt)*) => {{
-    //     let res = std::fmt::format(format_args!($($arg)*));
-    //     web_sys::console::log_1(&res.into());
-    // }}
-    ($($arg:tt)*) => {{}};
-}
 
 struct Particle {
     position: Vec2,
@@ -100,7 +94,6 @@ impl RustMlsMpm {
             Vec2::new(0.55, 0.85),
             0xffff0000,
         );
-        //particles.push(Particle::new(Vec2::new(0.55, 0.45), 0));
 
         let canvas = match canvas {
             Some(element) => element.dyn_into::<web_sys::HtmlCanvasElement>()?,
@@ -169,15 +162,15 @@ impl RustMlsMpm {
             // Polar decomposition for fixed corotated model
             let (r, _) = polar_decomp(particle.deformation_gradient);
 
-            let Dinv = 4.0 * inv_dx * inv_dx;
+            let d_inv = 4.0 * inv_dx * inv_dx;
 
-            let PF = mat_add_scalar(
+            let p_f = mat_add_scalar(
                 2.0 * mu
                     * (particle.deformation_gradient - r)
                     * particle.deformation_gradient.transpose(),
                 lambda * (J - 1.0) * J,
             );
-            let stress = -(dt * VOL) * (Dinv * PF);
+            let stress = -(dt * VOL) * (d_inv * p_f);
             let affine = stress + (PARTICLE_MASS * particle.apic_affine_momentum);
 
             // Translational momentum
@@ -254,20 +247,12 @@ impl RustMlsMpm {
                     let grid_v =
                         grid[base_coord.x as usize + i][base_coord.y as usize + j].velocity;
                     let weight = w[i].x * w[j].y;
-                    //console!("weight is {}, grid_v is: {}", weight, grid_v);
 
                     // Velocity
                     particle.velocity += weight * grid_v;
                     // APIC C
-                    let hmm = weight * grid_v;
-
-                    let outer = Mat2::from_cols_array(&[
-                        hmm.x * dpos.x,
-                        hmm.y * dpos.x,
-                        hmm.x * dpos.y,
-                        hmm.y * dpos.y,
-                    ]);
-                    particle.apic_affine_momentum += 4.0 * inv_dx * outer;
+                    particle.apic_affine_momentum +=
+                        4.0 * inv_dx * outer_product(weight * grid_v, dpos);
                 }
             }
 
@@ -296,7 +281,7 @@ impl RustMlsMpm {
         }
     }
 
-    pub fn draw(&mut self, mut dt: f32) -> Result<(), JsValue> {
+    pub fn draw(&mut self, dt: f32) -> Result<(), JsValue> {
         self.ctx.clear_colour_buffer(Colour {
             red: 0.9,
             green: 0.8,
